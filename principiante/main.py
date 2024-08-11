@@ -6,18 +6,15 @@
         4. Mayor que ...
         5. Tabla multiplicar
         6. Factorial de un numero
-        7. Suma de una lista
-        8. Mayor de una lista
-        9. Verificar si un elemento esta en la lista
-        10. Invertir una cadena
+        7. Factoria recrusivo
+        8. Suma de una lista
+        9. Mayor de una lista
+        10. Verificar si un elemento esta en la lista
+        11. Invertir una cadena
 '''
 
 def suma(num1:float, num2:float):
-    try:
-        result=num1+num2
-        print(result)
-    except:
-        print('Solo ingrese numeros')
+    return num1+num2
 
 def par_impar(num:int):
     if num%2!=0:
@@ -51,23 +48,56 @@ def tablemultiplicar():
         print(f'{num}*9={num*9}')
         print(f'{num}*10={num*10}')
 
-def factorial():
-    pass
+def factorial(num1:int):
+    fact=1
+    for i in range(num1+1):
+        if i==0:
+            i=1
+        fact*=i
+    return fact
+
+def factotialrecrusivo(num1:int):
+    result = 0
+    if num1 == 0 or num1 == 1:
+        result=1
+    elif num1>1:
+        result=num1*factotialrecrusivo(num1-1)
+
+    return result
 
 def listsuma():
-    pass
+    numlist = [5,4,7,9,8,6,7]
+    sum = 0
+    for num in numlist:
+        sum+=num
+    return sum
 
 def mayorlist():
-    pass
+    numlist = [5,4,7,9,8,6,7]
+    x=0
+    for num in numlist:
+        if x<num:
+            x=num
+    return x
 
-def elementinlist():
-    pass
+def elementinlist(x:int):
+    numlist = [5,4,7,9,8,6,7]
+    for num in numlist:
+        if x==num:
+            print('Numero encontrado')
+            break
 
 def cadenaback():
-    pass
+    numlist = [5,4,7,9,8,6,7]
+    numlist.reverse()
+
+    for num in numlist:
+        print(num)
 
 def main():
-    print('Hola Mundo y bienvenido a mi nivel principiante')
+    print('Hola Mundo y bienvenido a mi nivel principiante\nNivel principiante\n2. Suma de dos numeros\n3. Par o impar\n4. Mayor que ...\n5. Tabla multiplicar\n6. Factorial de un numero\n7. Factoria recrusivo\n8. Suma de una lista\n9. Mayor de una lista\n10. Verificar si un elemento esta en la lista\n11. Invertir una cadena')
+    num = int(input('Que opcion quieres'))
+
 
 if __name__ == "__main__":
     main()

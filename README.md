@@ -9,7 +9,8 @@ Nivel principiante
     4. Mayor que ...
     5. Tabla multiplicar
     6. Factorial de un numero
-    7. Suma de una lista
-    8. Mayor de una lista
-    9. Verificar si un elemento esta en la lista
-    10. Invertir una cadena
+    7. Factoria recrusivo
+    8. Suma de una lista
+    9. Mayor de una lista
+    10. Verificar si un elemento esta en la lista
+    11. Invertir una cadena
