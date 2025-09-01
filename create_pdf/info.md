@@ -8,4 +8,4 @@ Script para generar pdf a partir de un/unos json
 
 ```py
 pip install -r requiriments.txt
-
+```
