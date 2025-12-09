@@ -1,0 +1,9 @@
+[project]
+name = "appwrite-helper"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "appwrite>=13.6.1",
+]
