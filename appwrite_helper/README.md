@@ -1,1 +1,0 @@
-# Script de Ayuda mpara manejar cargas masivas en appwrite
