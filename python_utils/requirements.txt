@@ -1,0 +1,7 @@
+# Create pdf
+reportlab 
+pillow 
+requests
+
+# Appwrite
+appwrite

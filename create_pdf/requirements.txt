@@ -1,3 +1,0 @@
-reportlab 
-pillow 
-requests
