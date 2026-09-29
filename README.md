@@ -6,7 +6,7 @@ Colección de scripts personales de utilidad. Cada script es independiente y no 
 
 ```
 scripts/
-├── download/        # Descargador unificado sobre yt-dlp (genérico + seriesdonghua.com)
+├── download/        # Descargador unificado sobre yt-dlp (genérico + donghua: seriesdonghua.com, donghualife.com, mundodonghua.com)
 ├── python_utils/    # Utilidades Python (Appwrite, generación de PDFs)
 └── scrpits/         # Scripts de shell (certificados, resolución de pantalla, renombrado)
 ```
@@ -18,7 +18,7 @@ scripts/
 Wraper de `yt-dlp` que combina dos flujos:
 
 - **Genérico**: descarga videos/playlists/audio de cualquier plataforma soportada por yt-dlp.
-- **Donghua**: extrae la fuente de video de páginas de `seriesdonghua.com` (script ofuscado) y la descarga.
+- **Donghua**: extrae la fuente de video real de `seriesdonghua.com`, `donghualife.com` y `mundodonghua.com` y la descarga.
 
 Dependencia: `pip install yt-dlp` (ver `download/requirements.txt`).
 
@@ -56,29 +56,55 @@ python download/downloader.py -u "https://example.com/v" -r 720 --dry-run
 
 > Nota: `-m` y `-p` son mutuamente excluyentes.
 
-### Uso donghua (seriesdonghua.com)
+### Uso donghua (seriesdonghua.com, donghualife.com, mundodonghua.com)
 
 ```bash
 python download/downloader.py -u <URL-episodio> --donghua [opciones]
 ```
 
+El flujo `--donghua` detecta el dominio automáticamente y extrae la fuente de video real de cada página:
+
+| Sitio | Mecanismo de extracción |
+|---|---|
+| `seriesdonghua.com` | API interna `/api/player/get-server` (cookie de sesión + token CSRF) |
+| `donghualife.com` | tokens cifrados embebidos en la página, resueltos con `/api/player/source` |
+| `mundodonghua.com` | scripts ofuscados (JavaScript Packer): m3u8 directo (`asura`), Dailymotion (`tamamo`) e iframes (`fmoon`, `amagi`, `vhide`, `swish`) |
+
 | Opción | Descripción |
 |---|---|
-| `--source {asura,skadi,fembed,tape,amagi}` | Fuerza una fuente (si se omite, muestra un menú numerado) |
+| `--source <clave>` | Fuerza una fuente concreta (claves por sitio abajo). Si se omite, muestra un menú numerado y, si la elegida falla, reintenta automáticamente con las demás |
 | `-o, --output <dir>` | Directorio base (el episodio se guarda en `<output>/<título>/`) |
-| `--dry-run` | Muestra el comando sin ejecutarlo |
+| `--dry-run` | Muestra los comandos yt-dlp sin ejecutarlos (con `--source`, solo el de esa fuente) |
+
+Claves de fuente por sitio (las que yt-dlp resuelve de forma fiable van primero):
+
+| Sitio | Claves de `--source` |
+|---|---|
+| `seriesdonghua.com` | `dailymotion`, `okru`, `rumble`, `voe` |
+| `donghualife.com` | `directo` (m3u8 del propio sitio), `dailymotion`, `rumble` |
+| `mundodonghua.com` | `asura` (m3u8 directo), `tamamo` (Dailymotion), `fmoon`, `amagi`, `vhide`, `swish` |
 
 El título del episodio se toma del `<title>` de la página y se sanea antes de crear la carpeta/archivo. El resultado queda en `~/Downloads/<título>/<título>.mp4`.
 
 ```bash
-# Con menú interactivo de fuentes
-python download/downloader.py -u "https://seriesdonghua.com/episodio-5" --donghua
+# Menú interactivo (default: primera fuente; si falla, prueba las demás)
+python download/downloader.py -u "https://seriesdonghua.com/against-the-sky-supreme-episodio-553/" --donghua
 
-# Forzando la fuente DailyMotion
-python download/downloader.py -u "https://seriesdonghua.com/episodio-5" --donghua --source asura
+# Fijar una fuente concreta
+python download/downloader.py -u "https://seriesdonghua.com/against-the-sky-supreme-episodio-553/" --donghua --source dailymotion
+
+# donghualife.com (acepta slugs y UUIDs de /watch/<id>)
+python download/downloader.py -u "https://donghualife.com/watch/against-sky-supreme-1-551" --donghua
+
+# mundodonghua.com — m3u8 directo
+python download/downloader.py -u "https://www.mundodonghua.com/ver/against-the-sky-supreme/510" --donghua --source asura
 ```
 
-> Errores de yt-dlp: el script valida que `yt-dlp` esté instalado, comprueba el código de salida y termina con error (exit 1) en caso de fallo.
+> Notas:
+> - `directo` (donghualife) y `asura` (mundodonghua) son m3u8 directos: la opción más fiable de cada sitio.
+> - `okru`, `rumble`, `voe` y los iframes de terceros (`fmoon`, `amagi`, `vhide`, `swish`) pueden fallar según el soporte de yt-dlp (HTTP 403 en el extractor de Rumble, bug del extractor de OK.ru, "Unsupported URL" para Voe/Bysekoze/VidHidePro/EmbedWish); por eso el menú reintenta automáticamente con la siguiente fuente.
+> - `tamamo` (Dailymotion) puede estar dado de baja para algunos episodios (el sitio elimina el video); en ese caso usa `asura`.
+> - El script valida que `yt-dlp` esté instalado, comprueba el código de salida y termina con error (exit 1) si todas las fuentes fallan.
 
 ---
 
