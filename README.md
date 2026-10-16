@@ -79,6 +79,10 @@ python download/downloader.py -u "https://www.facebook.com/watch/?v=101532313799
 # Enlace corto fb.watch, solo audio
 python download/downloader.py -u "https://fb.watch/abcXYZ/" --facebook -m
 
+# Usando cookies del navegador (para videos restringidos)
+python download/downloader.py -u "https://www.facebook.com/usuario/videos/123/" --facebook --cookies-from-browser chrome:Default
+python download/downloader.py -u "https://www.facebook.com/usuario/videos/123/" --facebook --cookies-from-browser firefox:i1nba72r.default-release
+
 # Vista previa del comando
 python download/downloader.py -u "https://www.facebook.com/usuario/videos/123/" --facebook --dry-run
 ```
