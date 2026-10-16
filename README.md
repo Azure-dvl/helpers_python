@@ -6,7 +6,7 @@ Colección de scripts personales de utilidad. Cada script es independiente y no 
 
 ```
 scripts/
-├── download/        # Descargador unificado sobre yt-dlp (genérico + donghua: seriesdonghua.com, donghualife.com, mundodonghua.com)
+├── download/        # Descargador unificado sobre yt-dlp (genérico, facebook.com y donghua: seriesdonghua.com, donghualife.com, mundodonghua.com)
 ├── python_utils/    # Utilidades Python (Appwrite, generación de PDFs)
 └── scrpits/         # Scripts de shell (certificados, resolución de pantalla, renombrado)
 ```
@@ -15,9 +15,10 @@ scripts/
 
 ## 1. `download/downloader.py` — Descargador con yt-dlp
 
-Wraper de `yt-dlp` que combina dos flujos:
+Wraper de `yt-dlp` que combina tres flujos:
 
 - **Genérico**: descarga videos/playlists/audio de cualquier plataforma soportada por yt-dlp.
+- **Facebook**: flujo optimizado para URLs de `facebook.com` / `fb.watch` / `fb.me`.
 - **Donghua**: extrae la fuente de video real de `seriesdonghua.com`, `donghualife.com` y `mundodonghua.com` y la descarga.
 
 Dependencia: `pip install yt-dlp` (ver `download/requirements.txt`).
@@ -55,6 +56,34 @@ python download/downloader.py -u "https://example.com/v" -r 720 --dry-run
 ```
 
 > Nota: `-m` y `-p` son mutuamente excluyentes.
+
+### Uso facebook (`--facebook`)
+
+```bash
+python download/downloader.py -u <URL-facebook> --facebook [opciones]
+```
+
+Flujo optimizado para videos de Facebook (`facebook.com`, `www.facebook.com`, subdominios de locale como `es-la.facebook.com`, `fb.watch` y `fb.me`):
+
+- **Valida que la URL sea de Facebook**: si no lo es, sale con error claro (exit 1).
+- **User-Agent de navegador + `Referer: https://www.facebook.com/`**: Facebook bloquea peticiones que no parecen de un navegador.
+- **Formato con respaldo `/best`**: Facebook suele servir un único archivo progresivo; si no existe un formato con la altura pedida (`-r`), cae a `best` en lugar de fallar.
+- **Salida siempre `.mp4`** (`--merge-output-format mp4`).
+
+Combina con `-r`, `-m`, `-s`, `-p`, `-o` y `--dry-run` igual que el modo genérico. `--facebook` y `--donghua` son mutuamente excluyentes.
+
+```bash
+# Descargar un video de Facebook en 720p
+python download/downloader.py -u "https://www.facebook.com/watch/?v=10153231379946729" --facebook -r 720
+
+# Enlace corto fb.watch, solo audio
+python download/downloader.py -u "https://fb.watch/abcXYZ/" --facebook -m
+
+# Vista previa del comando
+python download/downloader.py -u "https://www.facebook.com/usuario/videos/123/" --facebook --dry-run
+```
+
+> Limitación: videos privados o que piden inicio de sesión requieren cookies de sesión; el script no las recibe, así que solo sirve para videos públicos.
 
 ### Uso donghua (seriesdonghua.com, donghualife.com, mundodonghua.com)
 

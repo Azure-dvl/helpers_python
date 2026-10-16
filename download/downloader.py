@@ -3,6 +3,7 @@
 """Descargador unificado basado en yt-dlp.
 
 Uso generico:   -u <url> [-m|-p] [-r 480|720|1080|best] [-s] [-o DIR]
+Facebook:       -u <url> --facebook [mismas opciones]  (facebook.com / fb.watch)
 Donghua:        -u <url> --donghua [--source CLAVE] [--dry-run]
 
 El modo --donghua extrae el enlace real de video desde las paginas:
@@ -195,6 +196,15 @@ def detect_site(url):
     if "mundodonghua.com" in host:
         return "mundo"
     return None
+
+
+_FACEBOOK_HOSTS = ("facebook.com", "fb.watch", "fb.com", "fb.me")
+
+
+def is_facebook_url(url):
+    """True si la URL pertenece a Facebook (incluye subdominios de locale)."""
+    host = urllib.parse.urlparse(url).netloc.lower().split(":")[0]
+    return any(host == d or host.endswith("." + d) for d in _FACEBOOK_HOSTS)
 
 
 def label_for_embed(url):
@@ -494,6 +504,60 @@ def build_generic_command(args):
     return cmd
 
 
+def build_facebook_command(args):
+    """Como el generico, pero con ajustes especificos de Facebook.
+
+    - User-Agent de navegador + Referer de facebook.com (Facebook bloquea
+      peticiones que no parecen de un navegador).
+    - Formato con respaldo /best cuando no existe un formato <= resolucion
+      pedida (Facebook suele servir un unico archivo progresivo).
+    - merge-output-format mp4 para que el resultado sea siempre .mp4.
+    """
+    cmd = [
+        "yt-dlp",
+        "--user-agent", USER_AGENT,
+        "--add-header", "Referer:https://www.facebook.com/",
+    ]
+
+    if args.music:
+        output_template = f"{args.output}/%(title)s.%(ext)s"
+        cmd.extend(["-x", "-f", "bestaudio/best"])
+    elif args.playlist:
+        output_template = f"{args.output}/%(playlist)s/%(title)s.%(ext)s"
+    else:
+        output_template = f"{args.output}/%(title)s.%(ext)s"
+
+    if not args.music:
+        if args.resolution != "best":
+            height = args.resolution
+            cmd.extend(
+                [
+                    "-f",
+                    f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best",
+                ]
+            )
+        else:
+            cmd.extend(["-f", "bestvideo+bestaudio/best"])
+        cmd.extend(["--merge-output-format", "mp4"])
+
+    if args.subs:
+        cmd.extend(["--write-subs", "--sub-lang", "en"])
+
+    cmd.extend(["-o", output_template])
+    cmd.append(args.url)
+
+    return cmd
+
+
+def run_facebook(args):
+    if not is_facebook_url(args.url):
+        raise DownloadError(
+            "--facebook solo acepta URLs de facebook.com, fb.watch o fb.me\n"
+            f"Recibido: {args.url}"
+        )
+    run_ytdlp(build_facebook_command(args), args.dry_run)
+
+
 def _download_source(args, title, output_dir, src):
     cmd = [
         "yt-dlp",
@@ -591,8 +655,8 @@ def run_donghua(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Descargador yt-dlp (generico o --donghua para seriesdonghua.com, "
-        "donghualife.com y mundodonghua.com)"
+        description="Descargador yt-dlp (generico, --facebook para facebook.com/fb.watch "
+        "o --donghua para seriesdonghua.com, donghualife.com y mundodonghua.com)"
     )
     parser.add_argument("-u", "--url", required=True, help="URL a descargar")
     parser.add_argument(
@@ -623,11 +687,18 @@ def main():
         action="store_true",
         help="Descargar subtitulos (ingles)",
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--donghua",
         action="store_true",
         help="Flujo de extraccion para seriesdonghua.com, donghualife.com y "
         "mundodonghua.com",
+    )
+    mode.add_argument(
+        "--facebook",
+        action="store_true",
+        help="Flujo optimizado para URLs de facebook.com / fb.watch / fb.me "
+        "(UA de navegador, referer, formato con respaldo y salida mp4)",
     )
     parser.add_argument(
         "--source",
@@ -648,13 +719,15 @@ def main():
     try:
         if args.donghua:
             run_donghua(args)
+        elif args.facebook:
+            run_facebook(args)
         else:
             run_ytdlp(build_generic_command(args), args.dry_run)
     except DownloadError as e:
         print(f"\nError: {e}")
         return 1
 
-    if not args.donghua:
+    if not args.donghua and not args.dry_run:
         print("\nDescarga completada")
     return 0
 
