@@ -518,6 +518,8 @@ def build_facebook_command(args):
         "--user-agent", USER_AGENT,
         "--add-header", "Referer:https://www.facebook.com/",
     ]
+    if getattr(args, "cookies_from_browser", None):
+        cmd.extend(["--cookies-from-browser", args.cookies_from_browser])
 
     if args.music:
         output_template = f"{args.output}/%(title)s.%(ext)s"
@@ -699,6 +701,13 @@ def main():
         action="store_true",
         help="Flujo optimizado para URLs de facebook.com / fb.watch / fb.me "
         "(UA de navegador, referer, formato con respaldo y salida mp4)",
+    )
+    parser.add_argument(
+        "--cookies-from-browser",
+        dest="cookies_from_browser",
+        metavar="BROWSER[+KEYRING][:PROFILE][::CONTAINER]",
+        help="Extrae cookies del navegador para descargar videos restringidos "
+        "(ej.: chrome, chrome:Default, firefox, firefox:default-release)",
     )
     parser.add_argument(
         "--source",
