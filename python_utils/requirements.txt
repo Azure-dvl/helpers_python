@@ -1,6 +1,6 @@
 # Create pdf
-reportlab 
-pillow 
+reportlab
+pillow
 requests
 
 # Appwrite

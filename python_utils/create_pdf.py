@@ -13,8 +13,19 @@ from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, S
 
 
 def load_json_data(file_path):
+    """Carga un JSON y valida que sea una lista de objetos.
+
+    reportlab espera campos por objeto; una lista de strings o un dict
+    suelto acabaria en un AttributeError con traceback.
+    """
     with open(file_path, "r", encoding="utf-8") as file:
-        return json.load(file)
+        data = json.load(file)
+    if not isinstance(data, list):
+        raise ValueError(f"{file_path}: se esperaba una lista JSON de objetos")
+    for i, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise ValueError(f"{file_path}[{i}]: se esperaba un objeto JSON")
+    return data
 
 
 def download_image(url):
@@ -101,8 +112,14 @@ def main():
     args = parser.parse_args()
 
     print("Iniciando...")
-    create_pdf(args.output, args.json_files, args.img_w, args.img_h)
+    try:
+        create_pdf(args.output, args.json_files, args.img_w, args.img_h)
+    except (OSError, ValueError) as e:
+        # JSON invalido, archivo inexistente o sin permisos: error claro, exit 1
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
     print("Completo")
+    return 0
 
 
 if __name__ == "__main__":
