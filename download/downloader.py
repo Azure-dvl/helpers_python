@@ -3,6 +3,7 @@
 """Descargador unificado basado en yt-dlp.
 
 Uso generico:   -u <url> [-m|-p] [-r 480|720|1080|best] [-s] [-o DIR]
+                [--cookies-from-browser NAV[:PERFIL]]  (vale para todos los modos)
 Facebook:       -u <url> --facebook [mismas opciones]  (facebook.com / fb.watch)
 Donghua:        -u <url> --donghua [--source CLAVE] [--dry-run]
 
@@ -171,9 +172,11 @@ def _http_post_json(opener, url, payload, referer, extra_headers=None):
 # Utilidades
 # ---------------------------------------------------------------------------
 
-def sanitize_filename(name):
+def sanitize_filename(name, max_bytes=200):
     name = re.sub(r'[<>:"/\\|?*]', "", name)
     name = re.sub(r"\s+", " ", name).strip(" .")
+    # Corta por bytes: los titulos largos rompen mkdir con ENAMETOOLONG (255 bytes)
+    name = name.encode("utf-8")[:max_bytes].decode("utf-8", errors="ignore").strip(" .")
     return name or "download"
 
 
@@ -465,6 +468,36 @@ def extract_mundo_sources(url):
 # Descarga
 # ---------------------------------------------------------------------------
 
+def choose_source(sources):
+    """Menu interactivo: devuelve el indice elegido (0-based).
+
+    Si stdin no esta disponible (EOF, ej. sin TTY o en pipeline) se usa la
+    primera fuente en vez de crashear con un traceback.
+    """
+    print("\nFuentes disponibles:")
+    for i, s in enumerate(sources, 1):
+        print(f"  [{i}] {s['label']:<22} -> {s['url']}")
+    try:
+        choice = input(
+            f"\nSelecciona fuente [1-{len(sources)}] (default: 1): "
+        ).strip()
+    except EOFError:
+        print("\n  [aviso] entrada no disponible, usando la primera fuente")
+        return 0
+    except KeyboardInterrupt:
+        raise DownloadError("Cancelado por el usuario")
+
+    if not choice:
+        return 0
+    try:
+        chosen = int(choice) - 1
+    except ValueError:
+        raise DownloadError("Opcion invalida")
+    if not 0 <= chosen < len(sources):
+        raise DownloadError("Opcion invalida")
+    return chosen
+
+
 def run_ytdlp(cmd, dry_run=False):
     print(f"\nEjecutando: {shlex.join(cmd)}")
     if dry_run:
@@ -498,6 +531,9 @@ def build_generic_command(args):
     if args.subs:
         cmd.extend(["--write-subs", "--sub-lang", "en"])
 
+    if args.cookies_from_browser:
+        cmd.extend(["--cookies-from-browser", args.cookies_from_browser])
+
     cmd.extend(["-o", output_template])
     cmd.append(args.url)
 
@@ -518,7 +554,7 @@ def build_facebook_command(args):
         "--user-agent", USER_AGENT,
         "--add-header", "Referer:https://www.facebook.com/",
     ]
-    if getattr(args, "cookies_from_browser", None):
+    if args.cookies_from_browser:
         cmd.extend(["--cookies-from-browser", args.cookies_from_browser])
 
     if args.music:
@@ -569,8 +605,10 @@ def _download_source(args, title, output_dir, src):
         "--no-playlist",
         "--user-agent", USER_AGENT,
         "--add-header", f"Referer:{args.url}",
-        src["url"],
     ]
+    if args.cookies_from_browser:
+        cmd.extend(["--cookies-from-browser", args.cookies_from_browser])
+    cmd.append(src["url"])
     print(f"\nDescargando desde {src['label']}...")
     run_ytdlp(cmd, args.dry_run)
 
@@ -582,18 +620,15 @@ def run_donghua(args):
             "--donghua soporta seriesdonghua.com, donghualife.com y mundodonghua.com"
         )
 
-    try:
-        if site == "series":
-            print("Extrayendo servidores de seriesdonghua.com...")
-            title, sources = extract_seriesdonghua_sources(args.url)
-        elif site == "donghualife":
-            print("Extrayendo fuentes de donghualife.com...")
-            title, sources = extract_donghualife_sources(args.url)
-        else:
-            print("Extrayendo servidores de mundodonghua.com...")
-            title, sources = extract_mundo_sources(args.url)
-    except DownloadError as e:
-        raise
+    if site == "series":
+        print("Extrayendo servidores de seriesdonghua.com...")
+        title, sources = extract_seriesdonghua_sources(args.url)
+    elif site == "donghualife":
+        print("Extrayendo fuentes de donghualife.com...")
+        title, sources = extract_donghualife_sources(args.url)
+    else:
+        print("Extrayendo servidores de mundodonghua.com...")
+        title, sources = extract_mundo_sources(args.url)
 
     if not sources:
         raise DownloadError("No se encontraron fuentes descargables")
@@ -613,25 +648,13 @@ def run_donghua(args):
         order = list(range(len(sources)))
         fallback = False
     else:
-        print("\nFuentes disponibles:")
-        for i, s in enumerate(sources, 1):
-            print(f"  [{i}] {s['label']:<22} -> {s['url']}")
-        choice = input(
-            f"\nSelecciona fuente [1-{len(sources)}] (default: 1): "
-        ).strip()
-        if not choice:
-            choice = "1"
-        try:
-            chosen = int(choice) - 1
-            if chosen < 0 or chosen >= len(sources):
-                raise ValueError
-        except ValueError:
-            raise DownloadError("Opcion invalida")
+        chosen = choose_source(sources)
         order = [chosen] + [i for i in range(len(sources)) if i != chosen]
         fallback = True
 
     output_dir = Path(args.output) / title
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if not args.dry_run:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     errors = []
     for i, src in enumerate([sources[j] for j in order]):
@@ -646,9 +669,10 @@ def run_donghua(args):
                 print(f"\n  [aviso] la fuente '{src['label']}' fallo: {e}")
                 print("  Probando la siguiente fuente...")
 
-    if fallback or len(errors) > 1 or not args.dry_run:
+    if errors:
         raise DownloadError("Todas las fuentes fallaron:\n  " + "\n  ".join(errors))
-    raise DownloadError(errors[0])
+    # inalcanzable: el bucle siempre retorna al descargar o rellena errors
+    raise DownloadError("No se ejecuto ninguna descarga")
 
 
 # ---------------------------------------------------------------------------
@@ -706,8 +730,9 @@ def main():
         "--cookies-from-browser",
         dest="cookies_from_browser",
         metavar="BROWSER[+KEYRING][:PROFILE][::CONTAINER]",
-        help="Extrae cookies del navegador para descargar videos restringidos "
-        "(ej.: chrome, chrome:Default, firefox, firefox:default-release)",
+        help="Extrae cookies del navegador para descargar videos restringidos, "
+        "en todos los modos (ej.: chrome, chrome:Default, firefox, "
+        "firefox:default-release)",
     )
     parser.add_argument(
         "--source",

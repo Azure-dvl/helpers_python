@@ -1,14 +1,16 @@
 # Helpers
 
+[![tests](https://github.com/Azure-dvl/helpers_python/actions/workflows/tests.yml/badge.svg)](https://github.com/Azure-dvl/helpers_python/actions/workflows/tests.yml)
+
 Colección de scripts personales de utilidad. Cada script es independiente y no comparte dependencias entre carpetas.
 
 ## Estructura
 
 ```
-scripts/
-├── download/        # Descargador unificado sobre yt-dlp (genérico, facebook.com y donghua: seriesdonghua.com, donghualife.com, mundodonghua.com)
-├── python_utils/    # Utilidades Python (Appwrite, generación de PDFs)
-└── scrpits/         # Scripts de shell (certificados, resolución de pantalla, renombrado)
+download/         # Descargador unificado sobre yt-dlp (genérico, facebook.com y donghua: seriesdonghua.com, donghualife.com, mundodonghua.com)
+python_utils/     # Utilidades Python (Appwrite, generación de PDFs)
+scrpits/          # Scripts de shell (certificados, resolución de pantalla, renombrado) — nombre del directorio así ya está escrito
+tests/            # Tests con unittest de la stdlib (sin dependencias extra)
 ```
 
 ---
@@ -37,6 +39,7 @@ python download/downloader.py -u <URL> [opciones]
 | `-s, --subs` | Descarga subtítulos en inglés |
 | `-m, --music` | Solo audio (extrae `bestaudio`; no descarga el video) |
 | `-p, --playlist` | Descarga con estructura de playlist (`~/Downloads/<playlist>/...`) |
+| `--cookies-from-browser <nav>` | Extrae cookies del navegador para vídeos restringidos (ej. `chrome:Default`, `firefox:default-release`). Vale para **todos** los modos: genérico, `--facebook` y `--donghua` |
 | `--dry-run` | Muestra el comando yt-dlp sin ejecutarlo |
 
 Ejemplos:
@@ -50,6 +53,9 @@ python download/downloader.py -u "https://www.youtube.com/playlist?list=xxx" -r 
 
 # Solo audio
 python download/downloader.py -u "https://example.com/cancion" -m
+
+# Con cookies del navegador (vídeos restringidos)
+python download/downloader.py -u "https://example.com/v" --cookies-from-browser chrome:Default
 
 # Vista previa del comando
 python download/downloader.py -u "https://example.com/v" -r 720 --dry-run
@@ -87,7 +93,7 @@ python download/downloader.py -u "https://www.facebook.com/usuario/videos/123/" 
 python download/downloader.py -u "https://www.facebook.com/usuario/videos/123/" --facebook --dry-run
 ```
 
-> Limitación: videos privados o que piden inicio de sesión requieren cookies de sesión; el script no las recibe, así que solo sirve para videos públicos.
+> Limitación: vídeos privados o que piden inicio de sesión necesitan cookies de sesión; usa `--cookies-from-browser` para que yt-dlp las lea de tu navegador (Firefox puede pedir la contraseña del keyring; Chrome puede requerir `--no-sandbox` en algunas distros).
 
 ### Uso donghua (seriesdonghua.com, donghualife.com, mundodonghua.com)
 
@@ -135,6 +141,7 @@ python download/downloader.py -u "https://www.mundodonghua.com/ver/against-the-s
 
 > Notas:
 > - `directo` (donghualife) y `asura` (mundodonghua) son m3u8 directos: la opción más fiable de cada sitio.
+> - Sin entrada interactiva (pipeline, cron o terminal cerrada) el menú no puede mostrarse: el script usa la primera fuente en lugar de fallar. `Ctrl+C` en el menú cancela con exit 1.
 > - `okru`, `rumble`, `voe` y los iframes de terceros (`fmoon`, `amagi`, `vhide`, `swish`) pueden fallar según el soporte de yt-dlp (HTTP 403 en el extractor de Rumble, bug del extractor de OK.ru, "Unsupported URL" para Voe/Bysekoze/VidHidePro/EmbedWish); por eso el menú reintenta automáticamente con la siguiente fuente.
 > - `tamamo` (Dailymotion) puede estar dado de baja para algunos episodios (el sitio elimina el video); en ese caso usa `asura`.
 > - El script valida que `yt-dlp` esté instalado, comprueba el código de salida y termina con error (exit 1) si todas las fuentes fallan.
@@ -203,7 +210,9 @@ python python_utils/create_pdf.py <archivo1.json> [archivo2.json ...] [opciones]
 ```
 
 - Cada archivo JSON genera una sección nueva (el nombre de la sección = nombre del archivo sin extensión).
+- El JSON debe ser una **lista de objetos** (`[{...}, {...}]`); si no lo es, el script sale con un error claro y exit 1 en lugar de un traceback.
 - El script incluye los campos `name`, `year` y `photo`; para añadir otros campos edita el bloque comentado dentro de `create_pdf()`.
+- Las fotos se descargan con timeout de 10 s: si una URL falla, el elemento se documenta sin foto y el PDF se genera igual.
 
 Ejemplo:
 
@@ -270,6 +279,18 @@ Ejemplos:
 ```
 
 Comportamiento seguro: valida que el número inicial sea un número, calcula el padding según la cantidad de archivos (para >999 no rompe el orden), omite nombres que ya existen sin pisarlos y es idempotente (re-ejecutarlo no duplica ni borra).
+
+---
+
+## 7. `tests/` — Tests
+
+Tests de las partes sin red de `download/downloader.py` y `python_utils/create_pdf.py`, con `unittest` de la stdlib (no requieren `yt-dlp` ni red):
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Se ejecutan también en CI (GitHub Actions) en cada push y pull request.
 
 ---
 
